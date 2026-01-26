@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+enum AccountType {
+  Student
+  Teacher
+}
+model Student {
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  password       String
+  profilePicture String          @default("/user.png")
+  type           AccountType     @default(Student)
+  devices        StudentDevice[]
+  teachers       Teacher[]       @relation("TeacherStudents")
+  resetPasswordPageToken      String?         @unique
+  resetPasswordTokenExpiresAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+model Teacher {
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  password       String
+  profilePicture String          @default("/user.png")
+  type           AccountType     @default(Teacher)
+  devices        TeacherDevice[]
+  students       Student[]       @relation("TeacherStudents")
+  resetPasswordPageToken      String?         @unique
+  resetPasswordTokenExpiresAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+model StudentDevice {
+  id            String      @id @default(uuid())
+  studentId     String
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  ip            String
+  userAgent     String
+  pageToken     String?     @unique
+  pageExpiresAt DateTime?
+  code          String?
+  codeExpiresAt DateTime?
+  resendExpiresAt DateTime?
+  isVerified    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+model TeacherDevice {
+  id            String      @id @default(uuid())
+  teacherId     String
+  teacher       Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  ip            String
+  userAgent     String
+  pageToken     String?     @unique
+  pageExpiresAt DateTime?
+  code          String?
+  codeExpiresAt DateTime?
+  resendExpiresAt DateTime?
+  isVerified    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
