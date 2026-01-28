@@ -12,7 +12,7 @@ export const StreamVideoProvider = ({ children }: { children: ReactNode }) => {
         id: "123123",
         name: "ali",
         username: "123123",
-        imageUrl: ";kaskf;asf.com"
+        imageUrl: "kaskfasf.com"
     }
     useEffect(() => {
         if (!user) return;

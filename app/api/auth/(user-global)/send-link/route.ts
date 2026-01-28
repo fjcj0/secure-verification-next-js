@@ -1,112 +1,108 @@
-import { addMinutesToDate, generatePageToken, prisma } from "@/lib/utils";
+import {
+  addMinutesToDate,
+  generatePageToken,
+  getIpAddressAndUserAgent,
+  prisma,
+} from "@/lib/utils";
+import { sendLink } from "@/template/email/reset-password/SendLink";
+import { sendEmail } from "@/utils/sendEmail";
 import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
-    const { email } = (await request.json()) as { email: string };
-    if (!email) {
+    const { ip, userAgent } = await getIpAddressAndUserAgent(request);
+    const teacherDevice = await prisma.teacherDevice.findFirst({
+      where: { ip, userAgent },
+      select: { id: true },
+    });
+    const studentDevice = await prisma.studentDevice.findFirst({
+      where: { ip, userAgent },
+      select: { id: true },
+    });
+    if (!teacherDevice && !studentDevice) {
       return NextResponse.json(
-        { success: false, error: "Email is required" },
-        { status: 400 },
+        { success: false, error: "Unauthorized device" },
+        { status: 403 }
       );
     }
-    const student = await prisma.student.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        password: true,
-        profilePicture: true,
-        type: true,
-        resetPasswordPageToken: true,
-        resetPasswordTokenExpiresAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-    const teacher = await prisma.teacher.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        password: true,
-        profilePicture: true,
-        type: true,
-        resetPasswordPageToken: true,
-        resetPasswordTokenExpiresAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const { email } = (await request.json()) as { email: string };
+    if (!email) {
+      return NextResponse.json({ success: false, error: "Email is required" },
+        { status: 400 });
+    }
+    const now = new Date();
+    const expiresAt = addMinutesToDate(15);
+    const student = await prisma.student.findUnique({ where: { email } });
+    const teacher = await prisma.teacher.findUnique({ where: { email } });
     if (!student && !teacher) {
       return NextResponse.json(
         { success: false, error: "User not found" },
         { status: 404 },
       );
     }
-    const now = new Date();
-
-    if (
-      student?.resetPasswordTokenExpiresAt != null &&
-      student.resetPasswordTokenExpiresAt > now
-    ) {
+    if (student?.resetPasswordTokenExpiresAt && student.resetPasswordTokenExpiresAt > now) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Reset link already sent. Please check your email.",
-        },
+        { success: false, error: "Reset link already sent" },
         { status: 429 },
       );
     }
-
-    if (
-      teacher?.resetPasswordTokenExpiresAt != null &&
-      teacher.resetPasswordTokenExpiresAt > now
-    ) {
+    if (teacher?.resetPasswordTokenExpiresAt && teacher.resetPasswordTokenExpiresAt > now) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Reset link already sent. Please check your email.",
-        },
+        { success: false, error: "Reset link already sent" },
         { status: 429 },
       );
     }
-    const resetToken = generatePageToken();
-    const expiresAt = addMinutesToDate(15);
     if (student) {
+      const token = generatePageToken();
       await prisma.student.update({
         where: { id: student.id },
         data: {
-          resetPasswordPageToken: resetToken,
+          resetPasswordPageToken: token,
           resetPasswordTokenExpiresAt: expiresAt,
         },
+      });
+      if (studentDevice) {
+        await prisma.studentDevice.update({
+          where: { id: studentDevice.id },
+          data: { isResetPassword: true },
+        });
+      }
+      await sendEmail({
+        from: process.env.EMAIL_DOMAIN!,
+        to: student.email,
+        subject: "إعادة تعيين كلمة المرور",
+        html: sendLink(token),
       });
     }
     if (teacher) {
+      const token = generatePageToken();
       await prisma.teacher.update({
         where: { id: teacher.id },
         data: {
-          resetPasswordPageToken: resetToken,
+          resetPasswordPageToken: token,
           resetPasswordTokenExpiresAt: expiresAt,
         },
       });
+      if (teacherDevice) {
+        await prisma.teacherDevice.update({
+          where: { id: teacherDevice.id },
+          data: { isResetPassword: true },
+        });
+      }
+      await sendEmail({
+        from: process.env.EMAIL_DOMAIN!,
+        to: teacher.email,
+        subject: "إعادة تعيين كلمة المرور",
+        html: sendLink(token),
+      });
     }
+    return NextResponse.json({
+      success: true,
+      message: "Reset password email sent",
+    });
+  }catch (error: unknown) {
     return NextResponse.json(
-      {
-        success: true,
-        message: "Password reset email sent",
-        resetToken,
-      },
-      { status: 200 },
-    );
-  } catch (error: unknown) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: `Fatal Error: ${error instanceof Error ? error.message : error}`,
-      },
-      { status: 500 },
+      { success: false, error: `Fatal Error: ${error instanceof Error ? error.message : error}` },
+      { status: 500 }
     );
   }
 }

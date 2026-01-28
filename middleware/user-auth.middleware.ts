@@ -1,8 +1,9 @@
-import { prisma } from "@/lib/utils";
+import { getIpAddressAndUserAgent, prisma } from "@/lib/utils";
 import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
 export async function authMiddleware(request: NextRequest) {
+  const { ip, userAgent } = await getIpAddressAndUserAgent(request);
   const token = request.cookies.get("token")?.value;
   if (!token) {
     return {
@@ -43,6 +44,22 @@ export async function authMiddleware(request: NextRequest) {
           profilePicture: true,
         },
       });
+      const checkIfStudentDeviceExist = await prisma.studentDevice.findFirst({
+        where: {
+          ip,
+          userAgent,
+          isVerified: true,
+          studentId: user?.id,
+        },
+      });
+      if (!checkIfStudentDeviceExist) {
+        return {
+          error: NextResponse.json(
+            { success: false, error: "Unauthorized or token expired" },
+            { status: 401 },
+          ),
+        };
+      }
     } else {
       user = await prisma.teacher.findUnique({
         where: {
@@ -56,6 +73,22 @@ export async function authMiddleware(request: NextRequest) {
           profilePicture: true,
         },
       });
+      const checkIfTeacherDeviceExist = await prisma.teacherDevice.findFirst({
+        where: {
+          ip,
+          userAgent,
+          isVerified: true,
+          teacherId: user?.id,
+        },
+      });
+      if (!checkIfTeacherDeviceExist) {
+        return {
+          error: NextResponse.json(
+            { success: false, error: "Unauthorized or token expired" },
+            { status: 401 },
+          ),
+        };
+      }
     }
     if (!user) {
       return {

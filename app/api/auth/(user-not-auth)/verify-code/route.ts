@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     }
     let user = null;
     if (studentDevice) {
-      await prisma.studentDevice.update({
-        where: { id: studentDevice.id },
+       const stuDevice = await prisma.studentDevice.update({
+       where: { id: studentDevice.id },
         data: {
           isVerified: true,
           code: null,
@@ -67,8 +67,16 @@ export async function POST(request: NextRequest) {
           type: true,
         },
       });
+      await prisma.studentDevice.update({
+        where: {
+          id:stuDevice.id
+        },
+        data: {
+          isResetPassword: false
+        }
+      });
     } else if (teacherDevice) {
-      await prisma.teacherDevice.update({
+     const teachDevice = await prisma.teacherDevice.update({
         where: { id: teacherDevice.id },
         data: {
           isVerified: true,
@@ -88,6 +96,14 @@ export async function POST(request: NextRequest) {
           profilePicture: true,
           type: true,
         },
+      });
+      await prisma.teacherDevice.update({
+        where: {
+          id:teachDevice.id
+        },
+        data: {
+          isResetPassword: false
+        }
       });
     }
     if (!user) {

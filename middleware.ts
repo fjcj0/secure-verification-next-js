@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { aj } from "./lib/utils";
 export async function middleware(request: NextRequest) {
   try {
-    const decision = await aj.protect(request, { requested: 1 });
+    const decision = await aj.protect(request);
     if (decision.isDenied()) {
       const reason = decision.reason;
       if (reason.isRateLimit && reason.isRateLimit()) {
         return NextResponse.json(
-          { error: "Rate limit exceeded, Too many requests!" },
-          { status: 429 },
+          {
+            error: "Rate limit exceeded, Too many requests!",
+            retryAfter: reason.reset,
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": reason.reset.toString(),
+            },
+          },
         );
       }
       if (reason.isBot && reason.isBot()) {
@@ -26,7 +34,6 @@ export async function middleware(request: NextRequest) {
       { status: 500 },
     );
   }
-  const origin = request.headers.get("origin");
   const allowedOrigins = ["http://localhost:4320", "http://localhost:3000"];
   if (allowedOrigins.includes(request.nextUrl.origin)) {
     const response = NextResponse.next();

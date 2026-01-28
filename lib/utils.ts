@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import arcjet, { tokenBucket, shield, detectBot } from "@arcjet/next";
+import arcjet, {  shield, detectBot,fixedWindow } from "@arcjet/next";
 import { PrismaClient } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -8,6 +8,12 @@ import { SignJWT } from 'jose';
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+/*
+    detectBot({
+      mode: "LIVE",
+      allow: ["CATEGORY:SEARCH_ENGINE"],
+    }),
+ */
 export const aj = arcjet({
   key: process.env.ARCJET_KEY!,
   characteristics: ["ip.src"],
@@ -15,15 +21,10 @@ export const aj = arcjet({
     shield({
       mode: "LIVE",
     }),
-    detectBot({
-      mode: "LIVE",
-      allow: ["CATEGORY:SEARCH_ENGINE"],
-    }),
-    tokenBucket({
-      mode: "LIVE",
-      refillRate: 70,
-      interval: 5,
-      capacity: 20,
+    fixedWindow({
+      mode: "LIVE", 
+      window: "20s", 
+      max: 30,        
     }),
   ],
 });
@@ -34,8 +35,8 @@ export async function getIpAddressAndUserAgent(request: NextRequest): Promise<{ 
   const ip = forwarded ? forwarded.split(",")[0].trim() : "Unknown";
   return { userAgent, ip };
 }
-export function generate6DigitCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+export function generate6DigitCode():NumericString {
+    return Math.floor(100000 + Math.random() * 900000).toString() as NumericString;
 }
 export function addMinutesToDate(minutes: number) {
     const date = new Date();

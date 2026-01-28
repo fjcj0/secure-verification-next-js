@@ -4,7 +4,9 @@ import {
   getIpAddressAndUserAgent,
   prisma,
 } from "@/lib/utils";
+import { sendEmail } from "@/utils/sendEmail";
 import { blockAuthenticatedUser } from "@/middleware/user-not-auth.middleware";
+import { sendCodeHtml } from "@/template/email/verification-code/SendCode";
 import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
@@ -46,24 +48,52 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       );
     }
-    const code = generate6DigitCode();
+    const code = generate6DigitCode() as NumericString;
     if (studentDevice) {
-      await prisma.studentDevice.update({
+      const student = await prisma.studentDevice.update({
         where: { id: studentDevice.id },
         data: {
           code,
           codeExpiresAt: addMinutesToDate(10),
           resendExpiresAt: addMinutesToDate(1),
         },
+        select: {
+          student: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      });
+      const sendVerfication = sendCodeHtml(device.code as NumericString);
+      await sendEmail({
+        from: process.env.EMAIL_DOMAIN!,
+        to: student.student.email,
+        subject: "توثيق الحساب",
+        html: sendVerfication,
       });
     } else if (teacherDevice) {
-      await prisma.teacherDevice.update({
+      const teacher = await prisma.teacherDevice.update({
         where: { id: teacherDevice.id },
         data: {
           code,
           codeExpiresAt: addMinutesToDate(10),
           resendExpiresAt: addMinutesToDate(1),
         },
+        select: {
+          teacher: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      });
+      const sendVerfication = sendCodeHtml(device.code as NumericString);
+      await sendEmail({
+        from: process.env.EMAIL_DOMAIN!,
+        to: teacher.teacher.email,
+        subject: "توثيق الحساب",
+        html: sendVerfication,
       });
     }
     return NextResponse.json({ success: true }, { status: 200 });

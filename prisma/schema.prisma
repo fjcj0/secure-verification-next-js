@@ -51,6 +51,7 @@ model StudentDevice {
   codeExpiresAt DateTime?
   resendExpiresAt DateTime?
   isVerified    Boolean     @default(false)
+  isResetPassword Boolean @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -66,6 +67,7 @@ model TeacherDevice {
   codeExpiresAt DateTime?
   resendExpiresAt DateTime?
   isVerified    Boolean     @default(false)
+  isResetPassword Boolean @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
